@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的物联网设备监控大屏</title>
+    <!-- 引入 ECharts -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <!-- 引入 Leaflet 地图 -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background-color: #f0f2f5; 
+        }
+        .header { 
+            text-align: center; 
+            margin-bottom: 20px; 
+            color: #333; 
+        }
+        .header span { 
+            font-size: 14px; 
+            color: #666; 
+            background: #e2e8f0; 
+            padding: 4px 10px; 
+            border-radius: 20px; 
+        }
+        .container { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 20px; 
+            justify-content: center; 
+        }
+        .card { 
+            background: white; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+            padding: 20px; 
+            flex: 1; 
+            min-width: 400px; 
+            height: 500px; 
+        }
+        #chart, #map { 
+            width: 100%; 
+            height: 100%; 
+        }
+        .status-bar { 
+            text-align: center; 
+            margin-top: 15px; 
+            font-size: 14px; 
+            color: #888; 
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛰️ 终端实时监控大屏</h1>
+        <span id="last-update">等待数据接入...</span>
+    </div>
+
+    <div class="container">
+        <!-- 左侧：温湿度折线图 -->
+        <div class="card">
+            <div id="chart"></div>
+        </div>
+        <!-- 右侧：GPS实时地图 -->
+        <div class="card">
+            <div id="map"></div>
+        </div>
+    </div>
+    
+    <div class="status-bar">
+        基于 STM32 + LoRa + ESP8266 + Python + HTML5 构建
+    </div>
+
+    <script>
+        // ================= 1. 初始化 ECharts 图表 =================
+        var chart = echarts.init(document.getElementById('chart'));
+        var chartOption = {
+            title: { text: '实时温湿度历史' },
+            tooltip: { trigger: 'axis' },
+            legend: { data: ['温度 (℃)', '湿度 (%)'] },
+            xAxis: { type: 'category', data: [] },
+            yAxis: [
+                { type: 'value', name: '温度', position: 'left', min: 0, max: 50 },
+                { type: 'value', name: '湿度', position: 'right', min: 0, max: 100 }
+            ],
+            series: [
+                { name: '温度 (℃)', type: 'line', smooth: true, data: [], yAxisIndex: 0, itemStyle: {color: '#ff7675'} },
+                { name: '湿度 (%)', type: 'line', smooth: true, data: [], yAxisIndex: 1, itemStyle: {color: '#74b9ff'} }
+            ]
+        };
+        chart.setOption(chartOption);
+        
+        // 窗口大小变化时自适应图表
+        window.addEventListener('resize', function() { 
+            chart.resize(); 
+        });
+
+        // ================= 2. 初始化 Leaflet 地图 =================
+        // 初始中心点设为中国某地，缩放级别5
+        var map = L.map('map').setView([35.86166, 104.195397], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        var marker = null; // 标记点
+
+        // ================= 3. 数据拉取与页面更新 =================
+        function fetchData() {
+            fetch('/api/data')
+                .then(response => response.json())
+                .then(data => {
+                    if(data.length === 0) return;
+
+                    // 获取最新的一条数据更新顶部状态栏
+                    var latest = data[data.length - 1];
+                    document.getElementById('last-update').innerText = 
+                        "最后更新时间: " + latest.time + " | 卫星数: " + latest.sats;
+
+                    // 更新图表数据
+                    var times = data.map(item => item.time.split(' ')[1]); // 取出时分秒
+                    var temps = data.map(item => item.temp);
+                    var humis = data.map(item => item.humi);
+                    
+                    chart.setOption({
+                        xAxis: { data: times },
+                        series: [{ data: temps }, { data: humis }]
+                    });
+
+                    // 更新地图定位 (仅当经纬度有效时)
+                    if (latest.lat !== 0 && latest.lon !== 0) {
+                        var latlng = [latest.lat, latest.lon];
+                        if (marker === null) {
+                            // 第一次收到坐标，创建气泡标记并缩放地图到该位置
+                            marker = L.marker(latlng).addTo(map)
+                                .bindPopup(`<b>当前位置</b><br>温度: ${latest.temp}℃<br>湿度: ${latest.humi}%`).openPopup();
+                            map.setView(latlng, 15); 
+                        } else {
+                            // 后续只更新气泡坐标和内容
+                            marker.setLatLng(latlng);
+                            marker.setPopupContent(`<b>当前位置</b><br>温度: ${latest.temp}℃<br>湿度: ${latest.humi}%`);
+                            
+                            // 如果设备移动出了当前地图视野范围，自动平移视角跟上
+                            if (!map.getBounds().contains(latlng)) {
+                                map.panTo(latlng);
+                            }
+                        }
+                    }
+                })
+                .catch(err => console.error("数据获取失败: ", err));
+        }
+
+        // 每 3 秒执行一次数据刷新
+        setInterval(fetchData, 3000);
+        
+        // 页面打开时立即执行一次
+        fetchData(); 
+    </script>
+</body>
+</html>

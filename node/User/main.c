@@ -18,7 +18,7 @@ void Hardware_Init(void)
     
     GPS_Init(); 
 	
-	UsartPrintf(USART1, " Hardware init OK\r\n"); // 修改为具体的串口，之前代码用的是USART_DEBUG宏，确保你的宏是对的
+	UsartPrintf(USART1, " Hardware init OK\r\n"); 
 	
 	while(DHT11_Init())
  	{
@@ -38,7 +38,7 @@ int main(void)
 	while(atk_mw1278d_init(115200))
 	{
 		UsartPrintf(USART1, "LoRa Init Error, Retrying...\r\n");
-		DelayMs(1000); // 你的原代码是 DelayXms，确保函数名正确
+		DelayMs(1000);
 	}
 	UsartPrintf(USART1, "LoRa Init OK\r\n");
 
@@ -81,6 +81,6 @@ int main(void)
 			UsartPrintf(USART1, "DHT11 Read Error\r\n");
 		}
 		
-		DelayMs(2000);	 // 原代码 DelayXms，请根据你的延时函数库确认名字
+		DelayMs(5000);
 	}
 }
