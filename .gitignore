@@ -1,0 +1,19 @@
+# Keil build files and user settings
+*.o
+*.d
+*.crf
+*.htm
+*.dep
+*.map
+*.lst
+*.bak
+*.uvguix.*
+*.uvoptx
+*.jlink
+JLinkLog.txt
+
+# Ignore specific build directories
+node/Objects/
+node/Listings/
+gateway/Objects/
+gateway/Listings/
