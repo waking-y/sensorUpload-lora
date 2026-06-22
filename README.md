@@ -83,12 +83,16 @@ Two STM32F103 boards with LoRa modules, one GPS and one DHT11 serve as end nodes
 
 ## 🖼️ 项目效果图展示
 
-*(请将你拍摄的实物图和系统截图放到工程目录下，然后在这里替换对应的图片路径)*
-
 ### 1. 硬件实物与接线图
 
 这里展示发送端与接收端的实际硬件组装与连线情况：
 
+![网关硬件实物](images/gateway.jpg)
+
+![网关硬件实物](images/node.jpg)
+
 ### 2. 云端大屏实时监控效果
 
 这是运行在云服务器上的最终 Web 前端可视化界面：
+
+![网关硬件实物](images/page.png)
